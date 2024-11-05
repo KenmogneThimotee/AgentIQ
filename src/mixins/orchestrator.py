@@ -1,6 +1,6 @@
 from copy import deepcopy
 import uuid
-from mixins.agent_mixin import AgentMixin, NotificationType
+from mixins.agent_mixin import AgentMixin, Message, NotificationType
 from mixins.input_mixin import InputMixin
 from .processor import ProcessorMixin
 from typing import Any, Union, Tuple, Dict, Optional, List
@@ -102,3 +102,43 @@ class OrchestratorMixin(AbstractBaseModel):
             agent = self.agents[execution_graph_node.id]
             agent.run(input)
         
+
+class EventOrchestratorMixin(AbstractBaseModel):
+
+    agent: Dict[str, AgentMixin]
+    event_mapping: Dict[str, List[str]]
+
+    def __init__(self, name: str):
+        self.name = name 
+        self.agent = {}
+
+    @property
+    def copy(self) -> 'OrchestratorMixin':
+        self_copy = deepcopy(self)
+        self_copy.execution_graph = deepcopy(self.execution_graph)
+        self_copy.nodes = deepcopy(self.nodes)
+        self_copy.roots = deepcopy(self.roots)
+        self_copy.current_node = deepcopy(self.current_node)
+        self_copy.agents = self.agents
+        return self_copy
+
+    def register_agent(self, agent: AgentMixin, messages: List[str]):
+        agent_id = f"{agent.name}"
+        agent.set_agent_context_id(sha256(agent_id.encode()).hexdigest())
+        self.agents[agent.id] = agent
+        agent.register_orchestrator(self)
+
+        for message in messages:
+            try:
+                self.event_mapping[message].add(agent.id)
+            except:
+                self.event_mapping[message] = set(agent.id)
+    
+    def write_message(self, message: Message):
+        try:
+            agents = self.event_mapping[message.name]
+        except:
+            raise ValueError("No agent for this event")
+        
+        for agent in agents:
+            agent.run(message.data)

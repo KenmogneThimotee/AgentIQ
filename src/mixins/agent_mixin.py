@@ -18,6 +18,12 @@ class AgentState(Enum):
     SUCCESS = "success"
     ERROR = "error"
 
+class Message:
+    name: str
+    data: Any
+    agent_name: str
+    agent_id: str
+
 class AgentMixin(AbstractBaseModel):
     """Mixin for agent handling."""
 
@@ -67,6 +73,9 @@ class AgentMixin(AbstractBaseModel):
         if self.agent_context_id is None:
             raise ValueError("Agent context ID has not been set")
         return self.agent_context_id
+    
+    def send_message(self, message: Message):
+        self.orchestrator.write_message(message)
 
     def run(self, input: Any):
         # TODO: Implement the run method
