@@ -1,6 +1,8 @@
-from pydantic import AbstractBaseModel
 
-class ProcessorMixin(AbstractBaseModel):
+from typing import Any
 
-    def process(data: Union[ResultMixin, InputMixin]) -> Union[ResultMixin, InputMixin]:
+
+class ProcessorMixin:
+
+    def process(self, data: Any) -> Any:
         return data

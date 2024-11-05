@@ -1,7 +1,6 @@
-from pydantic import AbstractBaseModel
 from pydantic.fields import Any
 
-class InputMixin(AbstractBaseModel):
+class InputMixin:
     """Mixin for input handling."""
 
     input: Any

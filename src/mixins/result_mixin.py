@@ -1,8 +1,7 @@
 
-from pydantic import AbstractBaseModel
 from pydantic.fields import Any
 
-class ResultMixin(AbstractBaseModel):
+class ResultMixin:
     """Mixin for result handling."""
 
     result: Any
