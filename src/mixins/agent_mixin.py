@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any
+from typing import Any, Callable, Dict, List
 
 from src.helpers.agents import AgentState, NotificationType
 from src.helpers.orchestrator import Message
@@ -16,8 +16,14 @@ class AgentMixin:
     agent_context_id: str
     state: AgentState
 
+    independent_messages: Dict[str, List[Callable]]
+
     def __init__(self, name: str):
         self.name = name 
+        self.agent_context_id = None
+        self.state = AgentState.INITIALIZED
+        self.output = None
+        self.independent_messages = {}
 
     def register_orchestrator(self, orchestrator: 'OrchestratorMixin') -> None:
         self.orchestrator = orchestrator
@@ -30,6 +36,15 @@ class AgentMixin:
 
     def get_result(self) -> Any:
         return self.output
+    
+    def add_message(self, message: Message, process_independently: bool = False, process_function: Callable = None) -> None:
+        if process_independently:
+            if message.name not in self.independent_messages:
+                self.independent_messages[message.name] = []
+            self.independent_messages[message.name].append(process_function)
+        else:
+            self.messages.append(message)
+    
     
     @property
     def is_initialized(self) -> bool:
@@ -59,10 +74,11 @@ class AgentMixin:
         return self.agent_context_id
     
     def send_message(self, message: Message):
+        message.agent_name = self.name
+        message.agent_id = self.id
         self.orchestrator.write_message(message)
 
     def run(self, input: Any):
-        print(f"Running agent {self.id} ::: {self.name}")
         self.state = AgentState.RUNNING
         self.output = input
         self.state = AgentState.SUCCESS
