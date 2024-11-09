@@ -8,6 +8,8 @@ from .input_mixin import InputMixin
 
 
 
+
+
 class AgentMixin:
     """Mixin for agent handling."""
 
@@ -16,14 +18,121 @@ class AgentMixin:
     agent_context_id: str
     state: AgentState
 
-    independent_messages: Dict[str, List[Callable]]
+    ingress_messages_callbacks: Dict[str, Callable]
+    ingress_messages: List[Message]
 
-    def __init__(self, name: str):
+    egress_messages_callbacks: Dict[str, Callable]
+    egress_messages: List[Message]
+    process_ingress_independently: bool
+    def __init__(self, name: str, emitted_messages: List[str], received_messages: List[str], process_ingress_independently: bool = False):
         self.name = name 
         self.agent_context_id = None
         self.state = AgentState.INITIALIZED
         self.output = None
-        self.independent_messages = {}
+        self.ingress_messages_callbacks = {}
+        self.ingress_messages = set(received_messages)
+        self.egress_messages_callbacks = {}
+        self.egress_messages = set(emitted_messages)
+        self.process_ingress_independently = process_ingress_independently
+
+    @staticmethod
+    def receive_message(message_name: str):
+        """Decorator to register a method as a message handler.
+        
+        Args:
+            message_name: The name of the message to handle
+            
+        Returns:
+            Decorator function that registers the method as a handler
+        """
+        def decorator(func):
+            def wrapper(self, *args, **kwargs):
+                if not self.check_ingress_message(message_name):
+                    raise ValueError(f"Message {message_name} not registered for agent {self.name}")
+                self.set_ingress_message_callback(message_name, func)
+                message = args[0]
+                return func(self, message.data)
+            return wrapper
+        return decorator
+    
+    @staticmethod
+    def emit_message(message_name: str):
+        """Decorator to register a method as a message handler.
+        
+        Args:
+            message_name: The name of the message to handle
+            
+        Returns:
+            Decorator function that registers the method as a handler
+        """
+        def decorator(func):
+            def wrapper(self, *args, **kwargs):
+                if not self.check_egress_message(message_name):
+                    raise ValueError(f"Message {message_name} not registered for agent {self.name}")
+                self.set_egress_message_callback(message_name, func)
+                data = func(self, *args, **kwargs)
+                message = Message(name=message_name, data=data)
+                self.send_message(message)
+            return wrapper
+        return decorator
+    
+    @receive_message("test_message")
+    def do_something(self):
+        pass
+
+    def set_ingress_message_callback(self, message: str, callback: Callable):
+        self.ingress_messages_callbacks[message] = callback
+
+    def set_egress_message_callback(self, message: str, callback: Callable):
+        self.egress_messages_callbacks[message] = callback
+    
+    def get_ingress_message_callback(self, message: str) -> Callable:
+        return self.ingress_messages_callbacks[message]
+    
+    def get_egress_message_callback(self, message: str) -> Callable:
+        return self.egress_messages_callbacks[message]
+    
+    def remove_ingress_message_callback(self, message: str):
+        del self.ingress_messages_callbacks[message]
+
+    def remove_egress_message_callback(self, message: str):
+        del self.egress_messages_callbacks[message]
+
+    def clear_ingress_message_callbacks(self):
+        self.ingress_messages_callbacks = {}
+
+    def clear_egress_message_callbacks(self):
+        self.egress_messages_callbacks = {}
+
+    def set_ingress_messages(self, message: str):
+        self.ingress_messages.add(message)
+
+    def set_egress_messages(self, message: str):
+        self.egress_messages.add(message)
+    
+    def get_ingress_messages(self) -> List[Message]:
+        return self.ingress_messages
+
+    def get_egress_messages(self) -> List[Message]:
+        return self.egress_messages
+    
+    def remove_ingress_message(self, message: str):
+        self.ingress_messages.discard(message)
+
+    def remove_egress_message(self, message: str):
+        self.egress_messages.discard(message)
+
+    def check_ingress_message(self, message: str) -> bool:
+        return message in self.ingress_messages
+
+    def check_egress_message(self, message: str) -> bool:
+        return message in self.egress_messages
+
+    def clear_ingress_messages(self):
+        self.ingress_messages = set()
+
+    def clear_egress_messages(self):
+        self.egress_messages = set()
 
     def register_orchestrator(self, orchestrator: 'OrchestratorMixin') -> None:
         self.orchestrator = orchestrator
@@ -34,18 +143,6 @@ class AgentMixin:
     def set_agent_context_id(self, agent_context_id: str) -> None:
         self.agent_context_id = agent_context_id
 
-    def get_result(self) -> Any:
-        return self.output
-    
-    def add_message(self, message: Message, process_independently: bool = False, process_function: Callable = None) -> None:
-        if process_independently:
-            if message.name not in self.independent_messages:
-                self.independent_messages[message.name] = []
-            self.independent_messages[message.name].append(process_function)
-        else:
-            self.messages.append(message)
-    
-    
     @property
     def is_initialized(self) -> bool:
         return self.state == AgentState.INITIALIZED
