@@ -18,23 +18,13 @@ class ExecutionGraphNode:
 class OrchestratorMixin:
 
     agents: Dict[str, AgentMixin]
-    event_mapping: Dict[str, List[str]]
     message_queue: Dict[str, List[Dict[str, Any]]]
 
     def __init__(self, name: str):
         self.name = name 
         self.agents = {}
         self.event_mapping = {}
-        self.message_queue = defaultdict(list({}))
-        
-    def update_execution_graph_state(self, agent_id: str, notification_type: NotificationType) -> None:
-        # Handle successful agent completion
-        if notification_type == NotificationType.SUCCESS:
-            agent = self.agents[agent_id]
-            if agent.is_success:
-                #TODO: Implement
-                print(f"Agent {agent_id} completed successfully")
-                pass
+        self.message_queue = defaultdict(list)
 
     def register_agent(self, agent: AgentMixin):
         agent_id = f"{agent.name}"
@@ -42,46 +32,35 @@ class OrchestratorMixin:
         self.agents[agent.id] = agent
         agent.register_orchestrator(self)
 
-        for message in agent.get_ingress_messages():
-            try:
-                self.event_mapping[message].add(agent.id)
-            except:
-                self.event_mapping[message] = set([agent.id])
 
-        self.message_queue[agent.id] = [{message: None} for message in agent.get_ingress_messages()]
-    
+        self.message_queue[agent.id] = [{message: callback.__name__} for messages, callbacks in agent.ingress_messages_callbacks.items() for message in messages.split(',') for callback in callbacks]
+
     def __check_if_all_messages_received(self, event_message: Dict[str, Any]) -> bool:
         for message in event_message.values():
             if message is None:
                 return False
         return True
+    
+    def __check_if_all_messages_received(self, callback_name: str, event_message: Dict[str, Any]) -> bool:
+        for data_callback in event_message.values():
+            if data_callback[1] != callback_name:
+                continue
+            if data_callback[0] is None:
+                return False
+        return True
 
     def write_message(self, message: Message):
         # Get the list of agent IDs subscribed to this message type
-        try:
-            agent_ids = self.event_mapping[message.name]
-        except:
-            raise ValueError("No agent for this event")
-        
+        agent_ids = self.message_queue.keys()
+        print(f"Message queue : {self.message_queue}")
         # Process message for each subscribed agent
         for agent_id in list(agent_ids):
             print(f"Running agent : {self.agents[agent_id]}")
             agent = self.agents[agent_id]
 
-            # If agent processes messages independently, call its callback directly
-            if agent.process_ingress_independently:
-                agent.get_ingress_messages_callbacks[message.name](message)
-            else:
-                # Otherwise check message queue for this agent
-                for index, event_message in enumerate(self.message_queue[agent_id]):
+            if message.name in self.message_queue[agent_id]:
+                for event_message in self.message_queue[agent_id]:
                     # If this message slot is empty, store the message data
-                    if not event_message[message.name]:
-                        event_message[message.name] = message.data
-                        break
-
-                    # If all required messages are received, process them
-                    if self.__check_if_all_messages_received(event_message):
-                        # Remove processed message set from queue
-                        self.message_queue[agent_id].pop(index)
-                        # Run agent with collected message data
-                        agent.run(event_message.values())
+                    print(f"Event message : {event_message}")
+                    print(f"Agent : {agent.name}")
+                    getattr(agent, event_message[message.name])(data=message.data)
