@@ -1,11 +1,11 @@
 # Start orchestrator on one machine
 from src.agent_client import AgentClient
 from src.helpers.orchestrator import Message
-from src.mixins.orchestrator import OrchestratorMixin
+from src.orchestrator import Orchestrator
 import time
 
 # Start orchestrator
-orchestrator = OrchestratorMixin("main_orchestrator")
+orchestrator = Orchestrator("main_orchestrator")
 orchestrator.start()
 
 # # Create and start an agent

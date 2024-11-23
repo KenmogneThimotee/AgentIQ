@@ -25,13 +25,7 @@ class RemoteAgent:
     last_heartbeat: float
     status: str = "ACTIVE"
 
-class ExecutionGraphNode:
-    id: str
-    children: Optional[List[str]]
-    parents: Optional[List[str]]
-
-
-class OrchestratorMixin:
+class Orchestrator:
 
     agents: Dict[str, AgentMixin]
     message_queue: Dict[str, List]
