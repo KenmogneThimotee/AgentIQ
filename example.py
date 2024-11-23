@@ -1,32 +1,25 @@
-from src.mixins.agent_mixin import AgentMixin
+# Start orchestrator on one machine
+from src.agent_client import AgentClient
+from src.helpers.orchestrator import Message
+
+# On another machine, start an agent
+agent = AgentClient(
+    name="agent1",
+    orchestrator_host="127.0.0.1"
+)
+
+# Subscribe to messages
+@agent.on_receive_message("test_message")
+def handle_test(data):
+    print(f"Agent 1 received: {data}")
+
+# Start the agent
+agent.start()
 
 
-class MyAgent(AgentMixin):
-    pass
-
-agent = MyAgent("test", received_messages=["hello", "goodbye"])
-agent.set_agent_context_id("test_context")
-@agent.on_receive_message("hello")
-def handle_hello(self, data):
-    print(f"Got hello with data: {data}")
-
-@agent.on_receive_message("goodbye")
-def handle_goodbye(self, data):
-    print(f"Got goodbye with data: {data}")
-
-@agent.emit_message("hello")
-def emit_hello(data):
-    print(f"Emitting hello with data: {data}")
-    return data
-
-agent.emit_hello(data={"test": "world"})
-
-
-# Handlers are available immediately after creation
-# handlers = agent.ingress_messages_callbacks
-# print(handlers)
-# Output will be something like:
-# {
-#     'hello': {'method_name': 'handle_hello', 'method': <bound method MyAgent.handle_hello>},
-#     'goodbye': {'method_name': 'handle_goodbye', 'method': <bound method MyAgent.handle_goodbye>}
-# }
+# # Cleanup
+# try:
+#     # Your main logic here
+#     pass
+# finally:
+#     agent.stop()
